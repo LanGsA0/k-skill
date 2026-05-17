@@ -75,6 +75,7 @@ npx --yes skills add <owner/repo> \
   --skill korea-weather \
   --skill cheap-gas-nearby \
   --skill public-restroom-nearby \
+  --skill emergency-room-beds \
   --skill fine-dust-location \
   --skill han-river-water-level \
   --skill subway-lost-property \
