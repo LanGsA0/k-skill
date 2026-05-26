@@ -126,10 +126,15 @@ jobs:
           if not data.get('ok'):
               print('Health response is not ok:', data)
               sys.exit(1)
-          missing = [k for k, v in data.get('upstreams', {}).items() if k.endswith('Configured') and v is not True]
+          # naverMapConfigured is expected to be false until NCP Maps keys are provisioned
+          KNOWN_UNCONFIGURED = {'naverMapConfigured'}
+          missing = [k for k, v in data.get('upstreams', {}).items() if k.endswith('Configured') and v is not True and k not in KNOWN_UNCONFIGURED]
           if missing:
               print('Upstreams not configured:', missing)
               sys.exit(1)
+          skipped = [k for k in KNOWN_UNCONFIGURED if not data.get('upstreams', {}).get(k)]
+          if skipped:
+              print(f'Note: {skipped} not yet configured (expected, see docs/features/naver-map-route.md)')
           print('Health OK. All upstreams configured.')
           "
 
