@@ -11,6 +11,7 @@ import string
 import sys
 import time
 from functools import reduce
+from typing import Any
 
 try:
     from Crypto.Cipher import AES
@@ -366,6 +367,12 @@ class PatchedKorail(Korail):
         if auto_login:
             self.login(korail_id, korail_pw)
 
+    def _result_check(self, data: dict[str, Any]) -> bool:
+        result_check = getattr(Korail, "_result_check", None)
+        if not callable(result_check):
+            raise KorailError("korail2 result checker is unavailable")
+        return bool(result_check(self, data))
+
     def _generate_sid(self, timestamp_ms: int) -> str:
         ensure_runtime_dependencies()
         plaintext = f"{self._device}{timestamp_ms}".encode("utf-8")
@@ -436,7 +443,8 @@ class PatchedKorail(Korail):
         include_no_seats: bool = False,
         include_waiting_list: bool = False,
     ):
-        kst_now = korail_mod.datetime.now(korail_mod.timezone.utc) + korail_mod.timedelta(hours=9)
+        korail_api: Any = korail_mod
+        kst_now = korail_api.datetime.now(korail_api.timezone.utc) + korail_api.timedelta(hours=9)
         if date is None:
             date = kst_now.strftime("%Y%m%d")
         if time_value is None:
@@ -444,17 +452,20 @@ class PatchedKorail(Korail):
         if passengers is None:
             passengers = [AdultPassenger()]
 
-        passengers = Passenger.reduce(passengers)
-        adult_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passengers if isinstance(p, AdultPassenger)], 0)
-        child_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passengers if isinstance(p, ChildPassenger)], 0)
+        reduced_passengers = Passenger.reduce(passengers)
+        if reduced_passengers is None:
+            raise KorailError("korail passenger reduction failed")
+        passenger_list: list[Any] = list(reduced_passengers)
+        adult_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passenger_list if isinstance(p, AdultPassenger)], 0)
+        child_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passenger_list if isinstance(p, ChildPassenger)], 0)
         toddler_count = reduce(
             lambda total, passenger: total + passenger.count,
-            [p for p in passengers if isinstance(p, ToddlerPassenger)],
+            [p for p in passenger_list if isinstance(p, ToddlerPassenger)],
             0,
         )
-        senior_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passengers if isinstance(p, SeniorPassenger)], 0)
+        senior_count = reduce(lambda total, passenger: total + passenger.count, [p for p in passenger_list if isinstance(p, SeniorPassenger)], 0)
 
-        headers, sid = self._auth_headers_and_sid(korail_mod.KORAIL_SEARCH_SCHEDULE)
+        headers, sid = self._auth_headers_and_sid(korail_api.KORAIL_SEARCH_SCHEDULE)
         payload = {
             "Device": self._device,
             "radJobId": "1",
@@ -482,13 +493,13 @@ class PatchedKorail(Korail):
         if sid:
             payload["Sid"] = sid
 
-        response = self._session.post(korail_mod.KORAIL_SEARCH_SCHEDULE, params=payload, headers=headers)
+        response = self._session.post(korail_api.KORAIL_SEARCH_SCHEDULE, params=payload, headers=headers)
         data = json.loads(response.text)
         if self._result_check(data):
             train_infos = data["trn_infos"]["trn_info"]
             if isinstance(train_infos, dict):
                 train_infos = [train_infos]
-            details = [(korail_mod.Train(info), info) for info in train_infos]
+            details = [(korail_api.Train(info), info) for info in train_infos]
             details = [(train, info) for train, info in details if train.dep_name == dep and train.arr_name == arr]
             filters = [lambda train: train.has_seat()]
             if include_no_seats:
@@ -499,6 +510,7 @@ class PatchedKorail(Korail):
             if not details:
                 raise NoResultsError()
             return details
+        raise NoResultsError()
 
     def search_train(
         self,
