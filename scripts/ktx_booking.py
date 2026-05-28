@@ -927,9 +927,20 @@ def command_seats(args: argparse.Namespace) -> None:
     car_payloads: list[dict[str, object]] = []
     for car in cars:
         raw = client.car_seats(raw_train, str(car["car_no_raw"]), passenger_count, room_class)
-        raw_seats = raw.get("seat_infos", {}).get("seat_info", [])
+        seat_infos = raw.get("seat_infos") if isinstance(raw, dict) else None
+        if not isinstance(seat_infos, dict):
+            raise SystemExit(
+                f"seat detail data is unavailable for car_no {car['car_no']}; "
+                "retry search or choose another train"
+            )
+        raw_seats = seat_infos.get("seat_info", [])
         if isinstance(raw_seats, dict):
             raw_seats = [raw_seats]
+        if not isinstance(raw_seats, list):
+            raise SystemExit(
+                f"seat detail data is unavailable for car_no {car['car_no']}; "
+                "retry search or choose another train"
+            )
         all_seats = [normalize_seat(seat) for seat in raw_seats if seat.get("h_con_seat_no") != "0A"]
         seats = sort_seats_for_booking(all_seats)
         if args.available_only:
