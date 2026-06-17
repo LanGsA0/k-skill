@@ -177,6 +177,63 @@ def clean_text(value: str) -> str:
     return value.strip()
 
 
+ACTION_CONTROL_RE = re.compile(
+    r"^(?:스크랩\s*\d*|저장하기|닫기|포지션\s*제안|메모하기|프로필\s*확인|이력서\s*확인|펼쳐보기|접기|이전|다음)$"
+)
+ACTION_CONTROL_INLINE_RE = re.compile(
+    r"(?:스크랩\s*\d+|저장하기|닫기|포지션\s*제안|메모하기|프로필\s*확인|이력서\s*확인|펼쳐보기|접기|이전|다음)"
+)
+
+
+def is_action_control_label(value: str) -> bool:
+    label = re.sub(r"\s+", " ", html.unescape(value)).strip()
+    return bool(label and ACTION_CONTROL_RE.match(label))
+
+
+def filter_action_control_text(value: str) -> str:
+    lines = []
+    for line in value.splitlines():
+        label = line.strip()
+        if not label or is_action_control_label(label):
+            continue
+        label = ACTION_CONTROL_INLINE_RE.sub(" ", label)
+        label = re.sub(r"\s+", " ", label).strip()
+        if label:
+            lines.append(label)
+    return "\n".join(lines).strip()
+
+
+def row_contains_other_resume(candidate_markup: str, rno: str) -> bool:
+    refs: list[str] = []
+    for href_rno, data_rno in re.findall(r"rNo=(\d+)|data-rno=[\"'](\d+)[\"']", candidate_markup):
+        refs.append(href_rno or data_rno)
+    return any(ref != rno for ref in refs)
+
+
+def extract_regex_candidate_markup(markup: str, match: re.Match[str], rno: str) -> str:
+    row_start = markup.rfind("<tr", 0, match.start())
+    if row_start >= 0:
+        row_open_end = markup.find(">", row_start, match.start())
+        row_end = markup.find("</tr>", match.end())
+        row_open = markup[row_start : row_open_end + 1] if row_open_end >= 0 else ""
+        if row_end >= 0 and f'data-rno="{rno}"' in row_open:
+            return markup[row_start : row_end + len("</tr>")]
+
+    booth_start = markup.rfind('<div class="booth"', 0, match.start())
+    if booth_start >= 0:
+        next_booth = markup.find('<div class="booth"', match.end())
+        section_end = markup.find('</section>', match.end())
+        end_candidates = [pos for pos in (next_booth, section_end) if pos >= 0]
+        booth_end = min(end_candidates) if end_candidates else min(len(markup), match.end() + 2500)
+        booth = markup[booth_start:booth_end]
+        if not row_contains_other_resume(booth, rno):
+            return booth
+
+    start = max(0, match.start() - 300)
+    end = min(len(markup), match.end() + 1200)
+    return markup[start:end]
+
+
 def parse_with_bs4(markup: str, limit: int) -> list[Candidate] | None:
     try:
         from bs4 import BeautifulSoup  # type: ignore
@@ -197,14 +254,32 @@ def parse_with_bs4(markup: str, limit: int) -> list[Candidate] | None:
             continue
         seen.add(rno)
 
-        container = link.find_parent(class_=re.compile(r"booth|list|row|person", re.I)) or link.parent
+        container = (
+            link.find_parent("tr", attrs={"data-rno": rno})
+            or link.find_parent(class_=re.compile(r"(^|\s)booth(\s|$)", re.I))
+            or link.parent
+        )
+        if container and row_contains_other_resume(str(container), rno):
+            # Broad ancestors such as tblSearchList/personList can contain several resumes.
+            # Falling back to the link itself is safer than mixing candidate evidence.
+            container = link.parent
+
         raw = clean_text(str(container)) if container else clean_text(str(link))
-        texts = [x.get_text(" ", strip=True) for x in (container.find_all(["dt", "dd", "p", "span", "button"]) if container else [])]
-        text_join = " | ".join(t for t in texts if t)
+        texts = []
+        for node in container.find_all(["dt", "dd", "p", "span", "li"]) if container else []:
+            label = node.get_text(" ", strip=True)
+            if label and not is_action_control_label(label):
+                texts.append(label)
+        for btn in container.select(".keywordSkill button, .keywordBox button") if container else []:
+            label = btn.get_text(" ", strip=True)
+            if label and not is_action_control_label(label):
+                texts.append(label)
+        text_join = " | ".join(dict.fromkeys(texts))
 
         name = ""
         meta = ""
-        dt = container.find("dt") if container else None
+        name_scope = container.select_one(".nameAge") if container else None
+        dt = (name_scope or container).find("dt") if container else None
         if dt:
             name = dt.get_text(" ", strip=True)
             dd = dt.find_next("dd")
@@ -217,9 +292,9 @@ def parse_with_bs4(markup: str, limit: int) -> list[Candidate] | None:
                 meta = "(" + m_name.group(2) + ")"
 
         skills = []
-        for btn in container.select("button") if container else []:
+        for btn in container.select(".keywordSkill button, .keywordBox button") if container else []:
             label = btn.get_text(" ", strip=True)
-            if label and label not in {"스크랩", "포지션 제안", "메모하기", "프로필 확인", "이력서 확인"}:
+            if label and not is_action_control_label(label):
                 skills.append(label)
 
         candidates.append(
@@ -230,7 +305,7 @@ def parse_with_bs4(markup: str, limit: int) -> list[Candidate] | None:
                 meta=meta,
                 career=(container.select_one(".career").get_text(" ", strip=True) if container and container.select_one(".career") else ""),
                 skills=", ".join(skills[:25]),
-                raw_summary=text_join[:1000] or raw[:1000],
+                raw_summary=filter_action_control_text(text_join[:1000] or raw[:1000]),
             )
         )
         if len(candidates) >= limit:
@@ -246,9 +321,8 @@ def parse_with_regex(markup: str, limit: int) -> list[Candidate]:
         if rno in seen:
             continue
         seen.add(rno)
-        start = max(0, m.start() - 1000)
-        end = min(len(markup), m.end() + 2500)
-        raw = clean_text(markup[start:end])
+        raw_markup = extract_regex_candidate_markup(markup, m, rno)
+        raw = clean_text(raw_markup)
         name = ""
         meta = ""
         nm = re.search(r"([가-힣A-Za-z]OO)\s*\(([^)]*)\)", raw)
@@ -261,7 +335,7 @@ def parse_with_regex(markup: str, limit: int) -> list[Candidate]:
                 url=urllib.parse.urljoin(BASE_URL, m.group("href")),
                 name=name,
                 meta=meta,
-                raw_summary=raw[:1000],
+                raw_summary=filter_action_control_text(raw[:1000]),
             )
         )
         if len(candidates) >= limit:
