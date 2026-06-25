@@ -47,6 +47,7 @@ class G2bOrderPlanHelperTest(unittest.TestCase):
         def fake_read_json(request):
             captured["url"] = request.full_url
             captured["method"] = request.get_method()
+            captured["headers"] = request.headers
             return {"items": [{"bizNm": "청소 용역"}]}
 
         payload = search_order_plans(
@@ -58,6 +59,7 @@ class G2bOrderPlanHelperTest(unittest.TestCase):
         self.assertEqual(payload["items"][0]["bizNm"], "청소 용역")
         self.assertEqual(captured["method"], "GET")
         self.assertTrue(captured["url"].startswith("https://proxy.example.com/v1/g2b/order-plans?"))
+        self.assertIn("k-skill-g2b-order-plan-search", captured["headers"]["User-agent"])
         self.assertIn("kind=service", captured["url"])
         self.assertIn("keyword=%EC%B2%AD%EC%86%8C", captured["url"])
 

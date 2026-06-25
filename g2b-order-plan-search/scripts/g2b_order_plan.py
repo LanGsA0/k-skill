@@ -13,11 +13,13 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping
 from typing import Any
 
 PROXY_BASE_URL_ENV_VAR = "KSKILL_PROXY_BASE_URL"
 DEFAULT_PROXY_BASE_URL = "https://k-skill-proxy.nomadamas.org"
 ROUTE = "/v1/g2b/order-plans"
+USER_AGENT = "k-skill-g2b-order-plan-search/0.1 (+https://github.com/NomaDamas/k-skill)"
 
 
 class ApiError(RuntimeError):
@@ -33,7 +35,7 @@ def _text_or_none(value: Any) -> str | None:
     return text or None
 
 
-def resolve_proxy_base_url(explicit: str | None = None, env: dict[str, str] | None = None) -> str:
+def resolve_proxy_base_url(explicit: str | None = None, env: Mapping[str, str] | None = None) -> str:
     env = os.environ if env is None else env
     raw = _text_or_none(explicit) or _text_or_none(env.get(PROXY_BASE_URL_ENV_VAR))
     if raw:
@@ -112,7 +114,7 @@ def search_order_plans(query: dict[str, str], *, base_url: str | None = None,
                        read_json: Any = read_json_response) -> dict[str, Any]:
     resolved_base = resolve_proxy_base_url(base_url)
     url = f"{resolved_base}{ROUTE}?{urllib.parse.urlencode(query)}"
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    request = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
     return read_json(request)
 
 
