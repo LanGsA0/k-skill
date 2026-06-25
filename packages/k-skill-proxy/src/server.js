@@ -45,6 +45,7 @@ const { resolveEducationOfficeFromNaturalLanguage } = require("./neis-office-cod
 const { normalizeNationalPensionQuery, fetchNationalPensionWorkplace } = require("./national-pension");
 const { normalizeFscCorpQuery, fetchFscCorpOutline } = require("./fsc-corp");
 const { normalizeG2bSanctionQuery, fetchG2bSanctions } = require("./g2b-sanction");
+const { normalizeG2bOrderPlanQuery, fetchG2bOrderPlans } = require("./g2b-order-plan");
 const {
   normalizeKoreanLawDetailQuery,
   normalizeKoreanLawSearchQuery,
@@ -3465,6 +3466,14 @@ function buildServer({ env = process.env, provider = null, now = () => new Date(
     route: "g2b-sanctioned-supplier",
     normalizer: normalizeG2bSanctionQuery,
     fetcher: fetchG2bSanctions,
+    request,
+    reply
+  }));
+
+  app.get("/v1/g2b/order-plans", async (request, reply) => handleKeyedDataGoKrLookup({
+    route: "g2b-order-plans",
+    normalizer: normalizeG2bOrderPlanQuery,
+    fetcher: fetchG2bOrderPlans,
     request,
     reply
   }));

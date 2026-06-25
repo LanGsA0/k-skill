@@ -79,6 +79,8 @@
 - KRX OPEN API 메인: https://openapi.krx.co.kr/contents/OPP/MAIN/main/index.cmd
 - KRX 종목 기본정보 API (KOSPI): http://data-dbg.krx.co.kr/svc/apis/sto/stk_isu_base_info
 - KRX 일별 매매정보 API (KOSPI): http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd
+- 잡코리아 공개 채용공고 검색: https://www.jobkorea.co.kr/Search/?stext=<검색어> — `job-posting-match`가 로그인 없이 `/Recruit/GI_Read/<id>` 링크가 포함된 공개 결과를 직접 조회한다.
+- 사람인 공개 채용공고 검색: https://www.saramin.co.kr/zf_user/search/recruit?searchword=<검색어> — `job-posting-match`가 로그인 없이 `rec_idx`가 포함된 공개 결과를 직접 조회한다.
 - MOLIT 아파트 매매 실거래가 API: https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade
 - MOLIT 아파트 전월세 API: https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent
 - MOLIT 오피스텔 매매 API: https://apis.data.go.kr/1613000/RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade
@@ -118,6 +120,12 @@
 - 다이소몰 매장 픽업 재고: https://www.daisomall.co.kr/api/pd/pdh/selStrPkupStck (Authorization: Bearer 헤더 필요)
 - 다이소몰 매장 픽업 가능 여부 fallback: https://www.daisomall.co.kr/api/ms/msg/selPkupStr (Bearer 재고 조회가 401/403으로 계속 막힐 때 `pickupEligibility` 보조 정보로 사용)
 - 다이소몰 온라인 재고: https://www.daisomall.co.kr/api/pdo/selOnlStck
+- 러브버그.com 지도: https://xn--2i0bt2q2wd1wb.com/
+- 러브버그.com 구별 점수 JSON: https://xn--2i0bt2q2wd1wb.com/api/map/gu-score
+- 러브버그.com 주간 제보 수 JSON: https://xn--2i0bt2q2wd1wb.com/api/map/weekly-report-count
+- 러브버그.com 클러스터 JSON: https://xn--2i0bt2q2wd1wb.com/api/map/clusters?level=sigungu&historicalYear=2026
+- 러브버그.com 동네 snapshot JSON: https://xn--2i0bt2q2wd1wb.com/api/map/areas?historicalYear=2026&includePolygon=false
+- 러브버그.com 익명 제보 RPC: https://sewrbxfawkmusnyzjoab.supabase.co/rest/v1/rpc/submit_anonymous_report (public anon key, `p_gu_code`, `p_lng`, `p_lat`, `p_accuracy_m`, `p_level`, `p_device_hash`, `p_context`, `p_image_url`, `p_indoor` body)
 - 강남언니 공개 검색: https://www.gangnamunni.com/search?q=<keyword>
 - 강남언니 공개 병원 페이지: https://www.gangnamunni.com/hospitals/<id>
 - 마켓컬리 검색 API(v4): https://api.kurly.com/search/v4/sites/market/normal-search
@@ -154,7 +162,8 @@
 - 당근 메인: https://www.daangn.com/
 - 당근 지역 검색 API: https://www.daangn.com/kr/api/v1/regions/keyword?keyword=<지역명>
 - 당근 중고거래 검색 Remix data route: https://www.daangn.com/kr/buy-sell/all/?_data=routes/kr.buy-sell._index
-- 당근부동산 검색 Remix data route: https://www.daangn.com/kr/realty/?_data=routes/kr.realty._index
+- 당근부동산 검색 지도 페이지: https://realty.daangn.com/map/{name1}/{name2}/{name3} — SSR `window.RELAY_STORE`에서 매물 후보를 읽는다.
+- 당근부동산 폐기된 Remix data route: https://www.daangn.com/kr/realty/?_data=routes/kr.realty._index — 2026-06 기준 HTTP 204 빈 응답, 사용 금지.
 - 당근알바 검색 Remix data route: https://www.daangn.com/kr/jobs/?_data=routes/kr.jobs._index
 - 당근중고차 검색 Remix data route: https://www.daangn.com/kr/cars/?_data=routes/kr.cars._index
 - 당근부동산 상세 페이지: https://realty.daangn.com/articles/<id>
@@ -229,6 +238,8 @@
 - 금융위 기업개요 endpoint: https://apis.data.go.kr/1160100/service/GetCorpBasicInfoService_V2/getCorpOutline_V2
 - 조달청 나라장터 사용자정보 서비스(부정당제재업체정보조회 포함): https://www.data.go.kr/data/15129466/openapi.do
 - 부정당제재 endpoint: https://apis.data.go.kr/1230000/ao/UsrInfoService02/getUnptRsttCorpInfo02 (inqryDiv=1 사업자번호 정확일치, 조회시점 유효 제재만)
+- 조달청 나라장터 발주계획현황서비스: https://www.data.go.kr/data/15129462/openapi.do
+- 발주계획현황 endpoint: https://apis.data.go.kr/1230000/ao/OrderPlanSttusService (물품/공사/용역/외자 발주계획 검색)
 - 국세청 고액·상습체납자 명단공개(무인증): https://www.nts.go.kr/nts/ad/openInfo/selectList.do
 - 지방행정 인허가데이터 LOCALDATA 파일 다운로드(무인증, CP949 CSV): https://file.localdata.go.kr/file/download/<업종slug>/info?orgCode=<지자체코드>
 - LOCALDATA 본체: https://www.localdata.go.kr
