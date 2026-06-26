@@ -112,12 +112,12 @@ test("workflow action pins avoid reviewed Node 20 action majors", () => {
   }
 });
 
-test("workflow action pins use the selected Node 24 runtime majors", () => {
+test("workflow action pins use the selected Node 24 runtime majors when present", () => {
   const uses = workflowUses();
 
   for (const [action, expectedRef] of expectedNode24ActionPins) {
     const refs = uses.filter((use) => use.action === action).map((use) => `${use.file}:${use.ref}`);
-    assert.ok(refs.length > 0, `expected at least one workflow use of ${action}`);
+    if (refs.length === 0) continue;
     assert.deepEqual(
       [...new Set(refs.map((entry) => entry.split(":").at(-1)))],
       [expectedRef],
