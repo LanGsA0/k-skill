@@ -25,6 +25,7 @@ def test_dangerous_methods_require_approval():
     assert popbill_cli.is_dangerous_method("sendSMS") is True
     assert popbill_cli.is_dangerous_method("CancelReserveRNbyRCV") is True
     assert popbill_cli.is_dangerous_method("resendFax_multi") is True
+    assert popbill_cli.is_dangerous_method("quitMember") is True
     assert popbill_cli.is_dangerous_method("delete") is True
     assert popbill_cli.is_dangerous_method("getInfo") is False
     assert popbill_cli.is_dangerous_method("getURL") is False

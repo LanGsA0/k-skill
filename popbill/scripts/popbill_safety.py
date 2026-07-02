@@ -16,6 +16,7 @@ DANGEROUS_METHOD_PREFIXES = (
     "issue",
     "join",
     "payment",
+    "quit",
     "refund",
     "refuse",
     "regist",
