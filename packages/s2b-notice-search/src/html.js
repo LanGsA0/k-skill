@@ -13,6 +13,7 @@ function parseListRow(rowHtml) {
   const organization = withoutOrdinal.find((text) => text !== itemType && text !== title && /(학교|교육청|기관|초등|중학교|고등)/.test(text)) || ""
   const status = findFirst(withoutOrdinal, /(진행|마감|완료|공고|취소|유찰)/) || ""
   const dates = withoutOrdinal.map(normalizeLooseDate).filter(Boolean)
+  if (!hasNoticeRowShape({ action, dates, itemType, organization, status, title })) return null
   return {
     noticeCode: code,
     estimateCode: code,
@@ -24,6 +25,11 @@ function parseListRow(rowHtml) {
     deadline: dates[1] || "",
     detailAction: action
   }
+}
+
+function hasNoticeRowShape(row) {
+  if (!row.action || !row.title || row.dates.length === 0) return false
+  return Boolean(row.itemType || row.organization || row.status)
 }
 
 function parseAttachments(source) {

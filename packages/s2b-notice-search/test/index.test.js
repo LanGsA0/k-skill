@@ -136,6 +136,32 @@ test("parses list fixture rows with detail action metadata", () => {
   assert.equal(rows[1].noticeCode, "BID-2026-002")
 })
 
+test("ignores S2B navigation rows when parsing a full page", () => {
+  // Given: a full S2B page fragment where the top navigation table appears before the notice table.
+  const fullPageFixture = `
+  <html>
+    <body>
+      <table class="gnb">
+        <tr>
+          <td><a href="#" onclick="fncGoMenu('tgru')">1인수의 즉시견적</a></td>
+          <td><a href="#" onclick="fncGoMenu('tomu1')">주문목록</a></td>
+          <td>견적구매</td>
+          <td>계약현황</td>
+        </tr>
+      </table>
+      ${listFixture}
+    </body>
+  </html>`
+
+  // When: the parser scans the whole page rather than an isolated result table.
+  const rows = parseListHtml(fullPageFixture)
+
+  // Then: only notice rows with date-bearing result data are returned.
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].title, "급식실 냉장고 구매 견적요청")
+  assert.equal(rows[1].title, "방과후 프로그램 위탁")
+})
+
 test("parses detail fixture HTML into fields, content, and attachments", () => {
   // Given: an S2B-like detail fixture.
   // When: the detail parser runs.
