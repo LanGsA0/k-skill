@@ -114,13 +114,13 @@ def read_json_response(request: urllib.request.Request | str) -> dict[str, Any]:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
-        if error.code == 503:
-            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code, url=getattr(error, "url", None)) from error
         body = error.read().decode("utf-8", errors="replace")
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
             payload = None
+        if error.code == 503 and isinstance(payload, dict) and payload.get("error") == "upstream_not_configured":
+            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code, url=getattr(error, "url", None)) from error
 
         if isinstance(payload, dict) and payload.get("message"):
             raise ApiError(str(payload["message"]), status_code=error.code, url=getattr(error, "url", None)) from error

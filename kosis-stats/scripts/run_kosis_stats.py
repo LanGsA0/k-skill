@@ -253,7 +253,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     list_cmd.add_argument(
         "--parent-id",
         default="",
-        help="Parent list ID for sub-categories. Empty string = top-level.",
+        help="Parent list ID for sub-categories (sent as parentListId). Empty string = top-level.",
     )
 
     explain = sub.add_parser(
@@ -270,8 +270,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     explain.add_argument(
         "--meta-itm",
         default="All",
-        help="Requested field(s): All(전체) or comma-separated list "
-        "(statsNm,statsKind,writingPurps,...). Default All.",
+        choices=["All", *_EXPLAIN_FIELD_LABELS.keys()] if "_EXPLAIN_FIELD_LABELS" in globals() else None,
+        help="Requested field: All(전체) or one field name (statsNm, statsKind, writingPurps, ...). Default All.",
     )
 
     indicator = sub.add_parser(
@@ -435,7 +435,7 @@ def build_list_params(api_key: str, args: argparse.Namespace) -> dict[str, str]:
         "format": "json",
         "jsonVD": "Y",
         "vwCd": args.vw_cd,
-        "parentId": args.parent_id,
+        "parentListId": args.parent_id,
     }
 
 
@@ -487,7 +487,7 @@ def is_proxy_not_configured_body(body: str) -> bool:
     return isinstance(payload, dict) and payload.get("error") == "upstream_not_configured"
 
 
-def fetch_text(url: str, timeout: int) -> str:
+def fetch_text(url: str, timeout: int, *, via_proxy: bool = False) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": "k-skill/kosis-stats"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -499,6 +499,8 @@ def fetch_text(url: str, timeout: int) -> str:
             raise KosisError("503", "k-skill-proxy에 필요한 KOSIS API 키가 설정되어 있지 않습니다. 운영자에게 문의하세요.") from exc
         raise KosisError(str(exc.code), f"HTTP {exc.code}: {body[:200]}") from exc
     except urllib.error.URLError as exc:
+        if not via_proxy:
+            raise KosisError(None, f"network error: {exc.reason}") from exc
         raise KosisError(
             None,
             "설정된 k-skill-proxy 서버가 응답하지 않습니다. "
@@ -550,8 +552,8 @@ def detect_kosis_error(payload: Any) -> KosisError | None:
     return None
 
 
-def call_kosis(url: str, timeout: int, *, format_hint: str = "json") -> Any:
-    text = fetch_text(url, timeout)
+def call_kosis(url: str, timeout: int, *, format_hint: str = "json", via_proxy: bool = False) -> Any:
+    text = fetch_text(url, timeout, via_proxy=via_proxy)
     xml_err = detect_xml_error(text)
     if xml_err is not None:
         raise xml_err
@@ -746,16 +748,21 @@ def render_indicator_text(payload: Any) -> str:
         jipyo_id = entry.get("statJipyoId", entry.get("jipyoId", "?"))
         jipyo_nm = entry.get("statJipyoNm", entry.get("jipyoNm", "?"))
         title = entry.get("jipyoExplan", "")
-        concept = entry.get("jipyoExplan1", entry.get("jipyoCalc", ""))
+        details = [
+            ("개념", entry.get("jipyoExplan1", entry.get("jipyoCalc", ""))),
+            ("산정방법", entry.get("jipyoExplan2", "")),
+            ("출처", entry.get("jipyoExplan3", "")),
+        ]
         lines.append(f"- [{jipyo_id}] {jipyo_nm}")
         if title:
             lines.append(f"  제목: {title}")
-        if concept:
-            # Truncate long text fields
-            display = concept[:500] if len(concept) > 500 else concept
-            lines.append(f"  내용: {display}")
-            if len(concept) > 500:
-                lines.append(f"  ... ({len(concept) - 500}자 생략, --json으로 전체)")
+        for label, value in details:
+            if not value:
+                continue
+            display = value[:500] if len(value) > 500 else value
+            lines.append(f"  {label}: {display}")
+            if len(value) > 500:
+                lines.append(f"  ... ({len(value) - 500}자 생략, --json으로 전체)")
     return "\n".join(lines)
 
 
@@ -859,7 +866,7 @@ def run(args: argparse.Namespace) -> int:
 
     format_hint = params.get("format", "json")
     try:
-        payload = call_kosis(url, args.timeout, format_hint=format_hint)
+        payload = call_kosis(url, args.timeout, format_hint=format_hint, via_proxy=use_proxy)
     except KosisError as exc:
         sys.stderr.write(f"{exc}\n")
         return 2

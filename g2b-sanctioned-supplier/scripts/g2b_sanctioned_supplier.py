@@ -67,13 +67,13 @@ def read_json_response(request: urllib.request.Request) -> dict[str, Any]:
                 raise ApiError("g2b sanction proxy returned a non-object JSON payload.")
             return payload
     except urllib.error.HTTPError as error:
-        if error.code == 503:
-            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code) from error
         body = error.read().decode("utf-8", errors="replace")
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
             payload = None
+        if error.code == 503 and isinstance(payload, dict) and payload.get("error") == "upstream_not_configured":
+            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code) from error
         if isinstance(payload, dict) and payload.get("message"):
             raise ApiError(str(payload["message"]), status_code=error.code) from error
         raise ApiError(f"g2b sanction proxy request failed with HTTP {error.code}", status_code=error.code) from error

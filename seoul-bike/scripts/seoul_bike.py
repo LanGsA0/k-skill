@@ -223,8 +223,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except urllib.error.HTTPError as exc:
-        if exc.code == 503:
+        body = exc.read().decode("utf-8", errors="replace")
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            payload = None
+        if exc.code == 503 and isinstance(payload, dict) and payload.get("error") == "upstream_not_configured":
             print(PROXY_KEY_NOT_CONFIGURED_MSG, file=sys.stderr)
+        elif isinstance(payload, dict) and payload.get("message"):
+            print(str(payload["message"]), file=sys.stderr)
         else:
             print(f"API HTTP 오류: {exc.code} {exc.reason}", file=sys.stderr)
         return 1

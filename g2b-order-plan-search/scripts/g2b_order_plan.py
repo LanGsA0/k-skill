@@ -101,13 +101,13 @@ def read_json_response(request: urllib.request.Request) -> dict[str, Any]:
             charset = response.headers.get_content_charset() or "utf-8"
             return json.loads(response.read().decode(charset))
     except urllib.error.HTTPError as error:
-        if error.code == 503:
-            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code) from error
         body = error.read().decode("utf-8", errors="replace")
         try:
             parsed = json.loads(body)
         except json.JSONDecodeError:
             parsed = {"message": body}
+        if error.code == 503 and parsed.get("error") == "upstream_not_configured":
+            raise ApiError(PROXY_KEY_NOT_CONFIGURED_MSG, status_code=error.code) from error
         message = parsed.get("message") or parsed.get("error") or body or str(error)
         raise ApiError(f"g2b order-plan proxy returned HTTP {error.code}: {message}", status_code=error.code) from error
     except urllib.error.URLError as error:

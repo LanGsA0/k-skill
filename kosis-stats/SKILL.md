@@ -111,7 +111,7 @@ python3 kosis-stats/scripts/run_kosis_stats.py --help
   - `--parent-id <LIST_ID>` (하위 카테고리 탐색, 기본 빈 문자열=최상위)
 - `explain`
   - `--stat-id <통계조사ID>` (단독) 또는 `--org-id 101 --table-id DT_1IN0001` (조합, 둘 중 하나 필수)
-  - `--meta-itm All|statsNm,statsKind,...` (기본 All)
+  - `--meta-itm All|statsNm|statsKind|...` (기본 All, 한 번에 단일 필드 또는 All)
 - `indicator`
   - `--jipyo-id 160` (필수, 지표ID)
   - `--service 1|2|3` (기본 1: 1=개념, 2=산정방법·출처, 3=전체설명)

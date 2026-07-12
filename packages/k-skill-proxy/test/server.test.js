@@ -1323,7 +1323,7 @@ test("KOSIS normalizers map public query aliases to upstream params", () => {
     format: "json",
     jsonVD: "Y",
     vwCd: "MT_ZTITLE",
-    parentId: "A"
+    parentListId: "A"
   });
 
   assert.deepEqual(normalizeKosisExplainQuery({ org_id: "101", table_id: "DT_1IN0001" }), {
@@ -1345,6 +1345,9 @@ test("KOSIS normalizers map public query aliases to upstream params", () => {
     pageNo: "1",
     numOfRows: "10"
   });
+
+  assert.throws(() => normalizeKosisListQuery({ vwCd: "INVALID" }), /supported vwCd/);
+  assert.throws(() => normalizeKosisExplainQuery({ statId: "A", metaItm: "statsNm,statsKind" }), /one supported field/);
 });
 
 test("KOSIS proxy injects the server-side key without accepting client apiKey", async () => {

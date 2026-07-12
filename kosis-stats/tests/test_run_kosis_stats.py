@@ -207,7 +207,7 @@ class UrlBuilderTest(unittest.TestCase):
         args = helper.parse_args(["list", "--vw-cd", "MT_ZTITLE", "--parent-id", "sub123"])
         params = helper.build_list_params("KEY", args)
         self.assertEqual(params["vwCd"], "MT_ZTITLE")
-        self.assertEqual(params["parentId"], "sub123")
+        self.assertEqual(params["parentListId"], "sub123")
         self.assertEqual(params["method"], "getList")
 
     def test_explain_params_with_org_and_table(self):
@@ -446,6 +446,19 @@ class RenderTextTest(unittest.TestCase):
         self.assertIn("160", text)
         self.assertIn("인구밀도", text)
         self.assertIn("1km²당 인구수", text)
+
+    def test_indicator_text_shows_calculation_and_source(self):
+        payload = [{
+            "statJipyoId": "160",
+            "statJipyoNm": "인구밀도",
+            "jipyoExplan2": "총인구를 면적으로 나눔",
+            "jipyoExplan3": "KOSIS",
+        }]
+        text = helper.render_indicator_text(payload)
+        self.assertIn("산정방법", text)
+        self.assertIn("총인구를 면적으로 나눔", text)
+        self.assertIn("출처", text)
+        self.assertIn("KOSIS", text)
 
 
 class DryRunTest(unittest.TestCase):

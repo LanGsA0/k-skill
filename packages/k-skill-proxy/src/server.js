@@ -888,16 +888,21 @@ function normalizeKosisDataQuery(query) {
 }
 
 function normalizeKosisListQuery(query) {
-  const vwCd = trimOrNull(query.vwCd ?? query.vw_cd);
-  if (!vwCd) {
-    throw new Error("Provide vwCd (service view code).");
+  const allowedViewCodes = new Set([
+    "MT_ZTITLE", "MT_OTITLE", "MT_GTITLE01", "MT_GTITLE02",
+    "MT_CHOSUN_TITLE", "MT_HANKUK_TITLE", "MT_STOP_TITLE",
+    "MT_RTITLE", "MT_BUKHAN", "MT_TM1_TITLE", "MT_TM2_TITLE", "MT_ETITLE"
+  ]);
+  const vwCd = (trimOrNull(query.vwCd ?? query.vw_cd) || "").toUpperCase();
+  if (!allowedViewCodes.has(vwCd)) {
+    throw new Error("Provide a supported vwCd service view code.");
   }
   return {
     method: "getList",
     format: "json",
     jsonVD: "Y",
     vwCd,
-    parentId: trimOrNull(query.parentId ?? query.parent_id) || ""
+    parentListId: trimOrNull(query.parentListId ?? query.parent_list_id ?? query.parentId ?? query.parent_id) || ""
   };
 }
 
@@ -906,9 +911,19 @@ function normalizeKosisExplainQuery(query) {
   const orgId = trimOrNull(query.orgId ?? query.org_id);
   const tblId = trimOrNull(query.tblId ?? query.table_id ?? query.tbl_id);
   const metaItm = trimOrNull(query.metaItm ?? query.meta_itm) || "All";
+  const allowedMetaItems = new Set([
+    "All", "statsNm", "statsKind", "statsEnd", "statsContinue", "basisLaw",
+    "writingPurps", "examinPd", "statsPeriod", "writingSystem", "writingTel",
+    "statsField", "examinObjrange", "examinObjArea", "josaUnit", "applyGroup",
+    "josaItm", "pubPeriod", "pubExtent", "pubDate", "publictMth", "examinTrgetPd",
+    "dataUserNote", "mainTermExpl", "dataCollectMth", "examinHistory", "confmNo", "confmDt"
+  ]);
 
   if (!statId && !(orgId && tblId)) {
     throw new Error("Provide statId or both orgId and tblId.");
+  }
+  if (!allowedMetaItems.has(metaItm)) {
+    throw new Error("metaItm must be All or one supported field name.");
   }
 
   const normalized = {

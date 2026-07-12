@@ -213,7 +213,7 @@ def is_proxy_not_configured_body(body: str) -> bool:
     return isinstance(payload, dict) and payload.get("error") == "upstream_not_configured"
 
 
-def http_get(url: str, *, timeout: int) -> Tuple[int, str, str]:
+def http_get(url: str, *, timeout: int, via_proxy: bool = False) -> Tuple[int, str, str]:
     headers = {
         "accept": "application/json",
         "user-agent": "k-skill/kstartup-search",
@@ -230,6 +230,8 @@ def http_get(url: str, *, timeout: int) -> Tuple[int, str, str]:
             raise HelperError(PROXY_KEY_NOT_CONFIGURED_MSG) from exc
         return exc.code, exc.headers.get("content-type", "") if exc.headers else "", body
     except urllib.error.URLError as exc:
+        if not via_proxy:
+            raise HelperError(f"network error: {exc.reason}") from exc
         raise HelperError(f"{PROXY_DOWN_MSG} (상세: {exc.reason})") from exc
 
 
@@ -389,7 +391,7 @@ def run(argv: Optional[List[str]] = None) -> int:
         return 3
 
     try:
-        status, content_type, body = http_get(url, timeout=args.timeout)
+        status, content_type, body = http_get(url, timeout=args.timeout, via_proxy=not args.direct)
     except HelperError as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 4

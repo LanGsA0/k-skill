@@ -366,13 +366,14 @@ def read_json_response(request: urllib.request.Request | str) -> dict:
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.load(response)
     except urllib.error.HTTPError as exc:
-        if exc.code == 503:
-            raise SystemExit(PROXY_KEY_NOT_CONFIGURED_MSG) from exc
         body = exc.read().decode("utf-8", errors="replace")
         try:
             payload = json.loads(body)
         except json.JSONDecodeError:
             payload = None
+
+        if exc.code == 503 and isinstance(payload, dict) and payload.get("error") == "upstream_not_configured":
+            raise SystemExit(PROXY_KEY_NOT_CONFIGURED_MSG) from exc
 
         message = payload.get("message") if isinstance(payload, dict) else None
         if isinstance(payload, dict) and payload.get("error") == "ambiguous_location":
