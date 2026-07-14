@@ -37,6 +37,7 @@
   "facts": {
     "title": "선거기관의 역할 및 대응사례 연구 등 국외출장보고서(오스트리아, 크로아티아)",
     "publishedAt": "2026-03-13",
+    "detailUrl": "https://www.nec.go.kr/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=303199",
     "institution": "중앙선거관리위원회",
     "country": "오스트리아, 크로아티아",
     "period": "2025. 11. 22.(토) ~ 11. 30.(일) [7박 9일]",
@@ -179,6 +180,7 @@
 - 상세 페이지: 본문 설명, 첨부 블록, 빠른보기 iframe 메타데이터 확인
 - PDF/HWP/HWPX: 기존 `hwp` 스킬의 kordoc 절차로 텍스트 추출 시도
 - PDF: `pdfjs-dist`를 함께 지정해 `kordoc --format json`으로 Markdown과 구조 정보를 추출
+- HTTP fallback: 직접 HTTP가 timeout/partial response를 내면 차단으로 단정하지 않고 `k-skill-browser-runtime` 또는 Aside Browser로 `a[href*="View.do"]`, `a[href*="Download.do"]`, `span.date`를 확인
 - 투명성 점검: 사실, 산술, 공개·미공개 항목, 원문 인용 기반 검토 신호, 정보공개청구 추천 문서를 분리해 표시
 
 ## 데이터 출처
@@ -192,7 +194,7 @@
 - 제공 형식: 서버 렌더 HTML 게시글 + 첨부 PDF/HWP/HWPX 등
 - 접근 방식: read-only 직접 조회
 
-2026-07-08 실측 기준으로 전체 5페이지 62건의 목록과 62개 첨부 URL 접근이 가능했다. 목록 첨부는 모두 PDF였고, 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`에서 `success: true`, `fileType: "pdf"`, Markdown 48,086자로 추출되었다.
+2026-07-08 실측 기준으로 전체 5페이지 62건의 목록과 62개 첨부 URL 접근이 가능했다. 목록 첨부는 모두 PDF였고, 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`에서 `success: true`, `fileType: "pdf"`, Markdown 48,086자로 추출되었다. 2026-07-14 리뷰 실측에서는 직접 HTTP가 목록/PDF 다운로드에서 timeout 또는 partial response를 낼 수 있지만, Aside Browser에서는 목록 62건/5페이지와 상세·첨부 링크가 정상 노출되는 경로가 확인되었다.
 
 ## 사용 절차
 
@@ -207,6 +209,34 @@
 9. 비용·일정 관련 항목이 있으면 `facts`, `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`를 생성한다. 원문에 있는 목적, 방문기관, 일정, 출장자 역할, 비용, 좌석등급, 숙박비, 일비, 결과 활용계획만 사용한다.
 10. 추출 불가 항목은 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다.
 11. 원본 파일은 작업 후 삭제하고 레포에 저장하지 않는다.
+
+## HTTP fallback
+
+직접 HTTP에서 목록 HTML이 일부 수신된 뒤 30초 안에 끝나지 않거나, 첨부 다운로드가 일부 바이트만 받은 뒤 120초 안에 완료되지 않으면 `http timeout or partial response`로 본다. 이 경우를 차단으로 단정하지 말고 Aside Browser 또는 `k-skill-browser-runtime`으로 같은 공식 URL을 연다.
+
+브라우저 fallback에서는 상세 링크를 `a[href*="View.do"][href*="cbIdx=1107"]`, 첨부 링크를 `a[href*="Download.do"][href*="cbIdx=1107"]`, 등록일을 `span.date`에서 우선 추출한다. 페이지 이동은 `pageIndex` 증가 또는 페이지네이션 클릭으로 수행하고, 새 `bcIdx`가 없거나 이미 본 `bcIdx`만 나오거나 다음 링크가 없거나 5페이지를 확인하면 종료한다.
+
+로그인 폼, CAPTCHA, 점검 문구, 공식 경로 밖 리다이렉트가 확인될 때만 차단/점검 실패로 보고한다.
+
+## kordoc fallback
+
+기본 명령은 다음과 같다.
+
+```bash
+npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format json
+```
+
+깨끗한 npm 격리 환경에서 위 명령이 `PDF 파싱에 pdfjs-dist가 필요합니다`로 실패하면 임시 로컬 프로젝트에 두 패키지를 같이 설치해 실행한다.
+
+```bash
+mkdir -p /tmp/kordoc-run
+cd /tmp/kordoc-run
+npm init -y
+npm install kordoc pdfjs-dist
+npx kordoc /tmp/report.pdf --format json
+```
+
+두 경로가 모두 실패하면 새 PDF 파서를 만들지 않고 `kordoc unavailable` 또는 `parse failed`로 보고한다. 임시 다운로드 파일과 임시 설치 디렉터리는 작업 후 삭제한다.
 
 ## 투명성 점검
 

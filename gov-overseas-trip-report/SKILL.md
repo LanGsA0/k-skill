@@ -37,7 +37,7 @@ metadata:
 
 실측 기준 게시판은 서버 렌더 HTML이며 로그인 없이 접근 가능하다. 목록 HTML에는 `View.do?cbIdx=1107&bcIdx=...`, `Download.do?...`, `span.date`가 노출된다.
 
-2026-07-08 실측에서는 총 62건, 5페이지가 확인되었고 목록에 노출된 62개 첨부가 모두 PDF였다. 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`으로 파싱 성공(`success: true`, `fileType: "pdf"`, Markdown 48,086자)했으며, 출장기간·출장국가/방문기관·출장목적·출장자·주요일정 표가 추출되었다. 향후 HWP/HWPX 첨부가 나타나면 같은 `kordoc` 절차를 사용한다.
+2026-07-08 실측에서는 총 62건, 5페이지가 확인되었고 목록에 노출된 62개 첨부가 모두 PDF였다. 최신 게시글 `bcIdx=303199`의 PDF 첨부는 `kordoc --format json`으로 파싱 성공(`success: true`, `fileType: "pdf"`, Markdown 48,086자)했으며, 출장기간·출장국가/방문기관·출장목적·출장자·주요일정 표가 추출되었다. 2026-07-14 리뷰 실측에서는 직접 HTTP가 일부 응답 후 timeout/partial response를 낼 수 있지만, Aside Browser에서는 목록 62건/5페이지와 상세·첨부 링크가 정상 노출되는 경로가 확인되었다. 향후 HWP/HWPX 첨부가 나타나면 같은 `kordoc` 절차를 사용한다.
 
 ## Inputs
 
@@ -66,8 +66,42 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 9. 비용·일정 관련 텍스트가 있으면 `arithmetic`, `disclosure`, `reviewSignals`, `recommendedDisclosureRequests`, `safeStatements`를 생성한다. 원문에 있는 목적, 방문기관, 일정, 출장자 역할, 비용, 좌석등급, 숙박비, 일비, 결과 활용계획만 사용하고, 시장가나 항공권 현재가를 임의로 조회하지 않는다.
 10. `success: false`, 빈 Markdown, 낮은 페이지 품질, 이미지 기반 스캔 PDF 등으로 추출할 수 없으면 실패 모드를 보고하고 원문 URL과 수동 확인 절차를 안내한다. 사용자가 명시적으로 요청하지 않는 한 OCR 모델 다운로드나 별도 OCR 파이프라인은 실행하지 않는다.
 11. 추출할 수 없거나 문서에 없는 정보는 추정하지 않고 `문서에서 확인 불가` 또는 `기재되어 있지 않음`으로 표시한다.
-12. 작업 후 임시 다운로드 파일을 삭제한다.
-13. 결과에는 항상 공식 게시글 URL과 첨부 원문 URL을 포함한다.
+12. 작업 후 임시 다운로드 파일과 임시 kordoc 설치 디렉터리를 삭제한다.
+13. 결과에는 항상 공식 출처 URL, 공식 상세 URL, 첨부 원문 URL을 포함한다.
+
+### HTTP fallback to Aside Browser
+
+직접 HTTP와 브라우저 표면을 구분한다. 다음 경우는 차단으로 단정하지 말고 `http timeout or partial response`로 보고한 뒤 `k-skill-browser-runtime` 또는 Aside Browser로 전환한다.
+
+- 목록 HTML이 일부 수신되었지만 30초 안에 요청이 끝나지 않는 경우
+- PDF/HWP/HWPX 다운로드가 일부 바이트만 받은 뒤 120초 안에 완료되지 않는 경우
+- 같은 공식 URL이 브라우저에서 로드되지만 CLI HTTP만 timeout 되는 경우
+
+Aside Browser fallback 절차:
+
+1. 목록 URL `https://www.nec.go.kr/site/nec/ex/bbs/List.do?cbIdx=1107`을 연다.
+2. 상세 링크는 `a[href*="View.do"][href*="cbIdx=1107"]`에서 `bcIdx`를 추출하고 절대 URL로 정규화한다.
+3. 첨부 링크는 `a[href*="Download.do"][href*="cbIdx=1107"]`에서 `bcIdx`, `streFileNm`, 파일명을 추출하고 절대 URL로 정규화한다.
+4. 등록일은 우선 `span.date`를 사용하고, 없으면 같은 행 또는 같은 목록 item의 날짜 텍스트만 사용한다.
+5. 페이지 이동은 목록 폼의 `pageIndex` 값을 1씩 증가시키거나 페이지네이션 링크를 클릭한다.
+6. 종료 규칙은 새 페이지에서 신규 `bcIdx`가 0개이거나, 이미 본 `bcIdx`만 나오거나, 페이지네이션 다음 링크가 없거나, 5페이지를 모두 확인한 경우다.
+7. 브라우저 fallback으로 확인한 URL도 `facts.detailUrl`과 `facts.attachments[].url`에 같은 공식 URL 형태로 기록한다.
+
+HTTP timeout과 partial response는 `blocked or login page`가 아니다. 로그인 폼, CAPTCHA, 대기/점검 문구, 빈 문서, 또는 공식 경로 밖 리다이렉트가 확인될 때만 차단/점검 실패로 보고한다.
+
+### kordoc fallback install
+
+우선 일회성 `npx` 명령을 시도한다. 깨끗한 npm 격리 환경에서 아래 명령이 `PDF 파싱에 pdfjs-dist가 필요합니다`로 실패하면, 새 파서를 만들지 말고 임시 로컬 프로젝트에 두 패키지를 같이 설치한 뒤 그 프로젝트의 bin을 사용한다.
+
+```bash
+mkdir -p /tmp/kordoc-run
+cd /tmp/kordoc-run
+npm init -y
+npm install kordoc pdfjs-dist
+npx kordoc /tmp/report.pdf --format json
+```
+
+이 fallback도 실패하면 `kordoc unavailable` 또는 `parse failed`로 보고하고, 원문 URL과 수동 확인 절차를 안내한다. 원본 보고서 파일과 임시 프로젝트는 작업 후 삭제 대상이며 레포에 저장하지 않는다.
 
 ## Transparency screening
 
@@ -151,6 +185,7 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
   "facts": {
     "title": "선거기관의 역할 및 대응사례 연구 등 국외출장보고서(오스트리아, 크로아티아)",
     "publishedAt": "2026-03-13",
+    "detailUrl": "https://www.nec.go.kr/site/nec/ex/bbs/View.do?cbIdx=1107&bcIdx=303199",
     "institution": "중앙선거관리위원회",
     "country": "오스트리아, 크로아티아",
     "period": "2025. 11. 22.(토) ~ 11. 30.(일) [7박 9일]",
@@ -360,6 +395,7 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 
 - `unsupported institution`: 선관위가 아닌 기관 요청
 - `empty response`: 목록/상세 페이지가 비어 있음
+- `http timeout or partial response`: 직접 HTTP가 일부 응답 후 끝나지 않음. 차단으로 단정하지 말고 Aside Browser fallback을 시도
 - `blocked or login page`: 차단, 점검, 로그인/대기 페이지로 보임
 - `unexpected HTML`: 제목, 날짜, 상세 URL, 첨부 URL 선택자가 바뀜
 - `attachment type unsupported`: PDF/HWP/HWPX가 아닌 첨부라 원문 URL과 수동 확인 절차만 반환
@@ -374,4 +410,4 @@ npx --yes --package kordoc --package pdfjs-dist kordoc /tmp/report.pdf --format 
 - 상세 페이지를 최소 1건 확인했다.
 - 첨부 타입을 `hwp|hwpx|pdf|unknown` 중 하나로 표시했다.
 - PDF/HWP/HWPX이면 `hwp` 스킬의 `kordoc` 절차를 시도하고 문서 근거가 있는 범위만 구조화하거나 실패 모드를 보고했다.
-- 공식 출처 URL, 첨부 원문 URL, 참고용/원문 확인 안내를 포함했다.
+- 공식 출처 URL, 공식 상세 URL, 첨부 원문 URL, 참고용/원문 확인 안내를 포함했다.
